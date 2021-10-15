@@ -2,13 +2,13 @@ import numpy as np
 from itertools import permutations
 from copy import deepcopy
 
-A = np.array([[2,1,2,3,4],
-              [0,5,6,7,8],
-              [7,9,10,11,12]])
-b = np.array([1,2,3])
+A = np.array([[1, 1, 0, 3, 4],
+              [0, 5, 0, 7, 8],
+              [0, 9, 1, 11, 12]])
+b = np.array([1, 2, 3])
 
 
-def kek(A=A, b=b):A
+def kek(A=A, b=b):
     indep_cols = []
     base_rows = []
     for i in range(A.shape[1]):
@@ -22,7 +22,7 @@ def kek(A=A, b=b):A
             return indep_cols, base_rows
     if len(indep_cols) == 0:
         indep_cols = [A.shape[1] - 1]
-        cols = deepcopy(indep_cols)
+    cols = deepcopy(indep_cols)
 
     r = len(indep_cols)
 
@@ -35,6 +35,8 @@ def kek(A=A, b=b):A
                 r = r_new
             if r == A.shape[0]:
                 break
+        else:
+            print('{eq')
 
     A_new = deepcopy(A).astype(float)
     b_new = deepcopy(b).astype(float)
@@ -42,23 +44,24 @@ def kek(A=A, b=b):A
     cols_perm = permutations(indep_cols, len(indep_cols))
 
     for cols_order in cols_perm:
-        for i, j in enumerate(cols_order):
-            base_col = A_new[:, j]
-            if base_col[i] == 0:
-                break
+        next_comb = False
+        # for i, j in enumerate(cols_order):
+        #     base_col = A_new[:, j]
+        #     if base_col[i] == 0:
+        #         next_comb = True
+        #         break
         for k, row in enumerate(A_new):
             print(k)
-            print(cols_order)
             if row[cols_order[k]] != 0:
-                rep_row = np.repeat(row.reshape(1,-1), A_new.shape[0], axis = 0)
+                rep_row = np.repeat(row.reshape(1, -1), A_new.shape[0], axis=0)
                 rep_row[k] = 0
-                bb = np.array([b_new[k]]*len(b_new))
+                bb = np.array([b_new[k]] * len(b_new))
                 bb[k] = 0
                 print(rep_row)
                 print(A_new[:, cols_order[k]])
                 print(row[cols_order[k]])
                 mul = (A_new[:, cols_order[k]] / row[cols_order[k]])
-                A_new -= rep_row * mul.reshape(-1,1)
+                A_new -= rep_row * mul.reshape(-1, 1)
                 A_new[k] /= row[cols_order[k]]
 
                 b_new -= bb * mul
@@ -67,15 +70,15 @@ def kek(A=A, b=b):A
                 print(A_new)
                 print(b_new)
             else:
+                next_comb = True
                 break
-        if (b_new < 0).any():
+        if (b_new < 0).any() or next_comb:
             continue
         else:
             break
     else:
         print("No solutions")
-        return
-    return indep_cols, base_rows
+
 
 if __name__ == '__main__':
     print(np.linalg.matrix_rank(A))

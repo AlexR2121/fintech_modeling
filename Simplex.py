@@ -2,6 +2,7 @@ import numpy as np
 from copy import deepcopy
 from itertools import permutations
 
+
 class Simplex:
     def __init__(self, obj_coefs, free_coef=0,
                  type_of_optimization='min',
@@ -16,7 +17,7 @@ class Simplex:
         assert A_eq is None or len(A_eq) == len(b_eq)
 
         self.name = name
-        self.obj_coefs = np.array(obj_coefs)[np.newaxis, :]
+        self.obj_coefs = np.array(obj_coefs)
         self.free_coef = free_coef
 
         # canonized form requires min
@@ -28,14 +29,14 @@ class Simplex:
             if isinstance(A_uneq[0], int) or isinstance(A_uneq[0], float):
                 A_uneq = [A_uneq]
             self.A_uneq = np.array(A_uneq)
-            self.b_uneq = np.array(b_uneq)[np.newaxis, :]
+            self.b_uneq = np.array(b_uneq)
             self.uneq_types = uneq_types
         else:
             self.A_uneq = None
 
         if A_eq is not None:
             self.A_eq = np.array(A_eq)
-            self.b_eq = np.array(b_eq)[np.newaxis, :]
+            self.b_eq = np.array(b_eq)
         else:
             self.A_eq = None
         self.vars_constraints = vars_constraints
@@ -69,7 +70,7 @@ class Simplex:
         self.A_uneq = np.hstack((self.A_uneq, new_coefs))
         if self.A_eq is not None:
             self.A_eq = np.hstack((self.A_eq, np.zeros(len(self.A_eq), new_coefs.shape[1])))
-        self.obj_coefs = np.hstack((self.obj_coefs, np.zeros((1, new_coefs.shape[1]))))
+        self.obj_coefs = np.hstack((self.obj_coefs, np.zeros((new_coefs.shape[1],))))
         if self.A_eq is not None:
             self.A = np.vstack((self.A_uneq, self.A_eq))
             self.b = np.vstack((self.b_uneq, self.b_eq))
@@ -81,7 +82,7 @@ class Simplex:
     def _deal_with_neg_b(self):
         # canonized form requires positive right part of eqs
         mask = self.b < 0
-        self.b = np.where(self.b >= 0, self.b, -self.b)
+        self.b = np.where(self.b >= 0, self.b, -self.b).ravel()
         self.A[mask] *= -1
         return self
 
@@ -115,7 +116,8 @@ class Simplex:
                         pivot_row = i
                         break
                 else:
-                    print('Хуй')
+                    print('В разрешающем столбце нет положительных элементов')
+                    return 0
                 # pivot_row = np.where(np.isclose(A[:, pivot_col], pivot_a))[0][0]
                 pivot_a = A[pivot_row, pivot_col]
                 new_i_col = deepcopy(i_col)
@@ -154,23 +156,33 @@ class Simplex:
             return 1
 
     def transform_to_base(self):
+
         indep_cols = []
         base_rows = []
+
+        # смотрим, есть ли столбцы с единицей
         for i in range(self.A.shape[1]):
             if (self.A[:, i] != 0).sum() == 1:
                 br = np.where(np.array(self.A[:, i]) != 0)[0][0]
-                if br not in base_rows:
+                # проверяем, что новый столбец не содержит выделенную раньше переменную и
+                # что коэффициент при переменной больше нуля
+                if br not in base_rows and self.A[br, i] > 0:
                     base_rows.append(br)
                     self.A[br] = self.A[br] / self.A[br, i]
+                    self.b[br] = self.b[br] / self.A[br, i]
                     indep_cols.append(i)
+            # проверяем, совпадает ли количество выделенных столбцов
+            # с количеством строк в А
             if len(indep_cols) == self.A.shape[0]:
                 return indep_cols, base_rows
+        # если не выделилось ни одного столбца с единицей
         if len(indep_cols) == 0:
             indep_cols = [self.A.shape[1] - 1]
-            cols = deepcopy(indep_cols)
+        cols = deepcopy(indep_cols)
 
         r = len(indep_cols)
 
+        # стакая столбцы, находим m независимых
         for col in range(self.A.shape[-1] - 1, -1, -1):
             if col not in cols:
                 cols.append(col)
@@ -184,38 +196,41 @@ class Simplex:
         A_new = deepcopy(self.A).astype(float)
         b_new = deepcopy(self.b).astype(float)
 
+        # выделяем единичный базис
         cols_perm = permutations(indep_cols, len(indep_cols))
 
         for cols_order in cols_perm:
-            for i, j in enumerate(cols_order):
-                base_col = self.A[:, j]
-                if base_col[i] == 0:
-                    break
-            for k, row in enumerate(A_new):
-                if row[cols_order[k]] != 0:
-                    rep_row = np.repeat(row, A_new.shape[0], axis = 0)
+            next_comb = False
+            for k, row in enumerate(A_new): # шаг метода Гаусса
+                if row[cols_order[k]] != 0: # в диагонали стоит не 0
+                    rep_row = np.repeat(row.reshape(1, -1), A_new.shape[0], axis=0)
                     rep_row[k] = 0
 
-                    b = np.repeat(b_new[k], len(b))
-                    b[k] = 0
+                    bb = np.array([b_new[k]] * len(b_new))
+                    bb[k] = 0
 
-                    A_new -= rep_row * A_new[:, cols_order[k]] / row[cols_order[k]]
+                    mul = (A_new[:, cols_order[k]] / row[cols_order[k]])
+
+                    A_new -= rep_row * mul.reshape(-1, 1)
                     A_new[k] /= row[cols_order[k]]
 
-                    b_new -= b * A_new[:, cols_order[k]] / row[cols_order[k]]
+                    b_new -= bb * mul
                     b_new[k] /= row[cols_order[k]]
                 else:
+                    next_comb = True
                     break
-            if (b_new < 0).any():
+            if (b_new < 0).any() or next_comb: # проверяем, не получилось ли отрицательных b
                 continue
-            else:
+            else: # если все в порядке
+                indep_cols = cols_order
+                base_rows = tuple(range(self.A.shape[0]))
                 break
         else:
-            print("No solutions")
-
-
+            print("Can't extract basis")
+            return 0
 
         self.A = A_new
+        self.b = b_new
 
         # Transform obj_fun
         for j, i in zip(indep_cols, base_rows):
@@ -237,10 +252,10 @@ class Simplex:
             j_row = np.array([j for j in range(self.A.shape[1]) if j not in i_col]).ravel()
             A = self.A[:, j_row][base_rows]
             i_col = np.array(i_col)
-            p_row = self.obj_coefs[0][j_row].ravel()
+            p_row = self.obj_coefs[j_row]
             print(self.b)
             print(base_rows)
-            b_col = self.b.ravel()[base_rows]
+            b_col = self.b[base_rows]
             Q0 = self.free_coef
             print(f'i_col: {i_col + 1}')
             print(f'j_row: {j_row + 1}')
