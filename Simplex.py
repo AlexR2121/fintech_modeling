@@ -17,7 +17,7 @@ class Simplex:
         assert A_eq is None or len(A_eq) == len(b_eq)
 
         self.name = name
-        self.obj_coefs = np.array(obj_coefs)
+        self.obj_coefs = np.array(obj_coefs).astype(float)
         self.free_coef = free_coef
 
         # canonized form requires min
@@ -101,24 +101,51 @@ class Simplex:
         self.var_inds = np.arange(self.A.shape[1])
         return self
 
-    @staticmethod
-    def simplex_step(i_col, j_row, A, p_row, b_col, Q0):
+    def _deal_with_arts_in_basis(self, i_col, A, b_col, art):
+        arts_in_basis = np.in1d(i_col, art)
+        all_zeros = np.all(A == 0, axis=0)
+        z_mask = np.bitwise_and(arts_in_basis, all_zeros)
+        if z_mask.any():
+            A = A[z_mask]
+            b_col = b_col[z_mask]
+            i_col = i_col[z_mask]
+        if np.in1d(i_col, art).any():
+            for i, row in enumerate(A):
+                if not np.in1d(i_col, art)[i]:
+                    continue
+                else:
+                    art_pivot_coords = (i, np.arange(len(row))[row!=0][0])
+        else:
+            art_pivot_coords = 0
+        return A, b_col, i_col, art_pivot_coords
+
+    def simplex_step(self, i_col, j_row, A, p_row, b_col, Q0, art = None, pivot_elem = None):
+
+        # lel = np.argsort(p_row)
+        # lol = np.sort(p_row)
+        # if np.isclose(lol[0],lol[1]):
+        #     ik = 1
+        #     pivot_col = lel[ik]
+        # else:
+        #     pivot_col = lel[0]
         pivot_col = np.argmin(p_row)
 
-        if p_row[pivot_col] < 0:
-            if np.max(A[:, pivot_col]) < 0:
-                return 0
+        if p_row[pivot_col] < 0 or pivot_elem is not None: # проверяем закончено ли обновление или случай IIб
+            if np.max(A[:, pivot_col]) < 0 and pivot_elem is None:
+                return i_col, j_row, A, p_row, b_col, Q0, 0, None
             else:
-                # pos_a_ij = A[A[:, pivot_col] > 0, pivot_col]
-                b_a = np.argsort(b_col / pivot_col)
-                for i in b_a:
-                    if A[i, pivot_col] > 0:
-                        pivot_row = i
-                        break
+                if pivot_elem is None: # проверяем не случай ли IIб
+                    b_a = np.argsort(b_col / A[:, pivot_col])
+                    for i in b_a:
+                        if A[i, pivot_col] > 0:
+                            pivot_row = i
+                            break
+                    else:
+                        print('В разрешающем столбце нет положительных элементов')
+                        return i_col, j_row, A, p_row, b_col, Q0, 0, None
                 else:
-                    print('В разрешающем столбце нет положительных элементов')
-                    return 0
-                # pivot_row = np.where(np.isclose(A[:, pivot_col], pivot_a))[0][0]
+                    pivot_row, pivot_col = pivot_elem
+
                 pivot_a = A[pivot_row, pivot_col]
                 new_i_col = deepcopy(i_col)
                 new_j_row = deepcopy(j_row)
@@ -148,12 +175,24 @@ class Simplex:
 
                 new_b_col = b_col - pivot_b_hat * A[:, pivot_col]
                 new_b_col[pivot_row] = pivot_b_hat
-
                 new_Q0 = Q0 - pivot_b_hat * p_row[pivot_col]
 
-                return new_i_col, new_j_row, new_A, new_p_row, new_b_col, new_Q0
+                if art is not None:
+                    mask = ~np.in1d(new_j_row, art)
+                    new_A = new_A[:, mask]
+                    new_p_row = new_p_row[mask]
+                    new_j_row = new_j_row[mask]
+                    if np.isclose(new_Q0, 0) and not np.in1d(new_i_col, art).any():
+                        return new_i_col, new_j_row, new_A, new_p_row, new_b_col, new_Q0, 1, None
+                    elif np.isclose(new_Q0, 0) and np.in1d(new_i_col, art).any():
+                        new_A, new_b_col, new_i_col, art_pivot_coords = self._deal_with_arts_in_basis(i_col, A, b_col, art)
+                        return new_i_col, new_j_row, new_A, new_p_row, new_b_col, new_Q0, None, art_pivot_coords
+                return new_i_col, new_j_row, new_A, new_p_row, new_b_col, new_Q0, None, None
+        elif p_row[pivot_col] >= 0 and art is not None:
+            if Q0 < 0:
+                return i_col, j_row, A, p_row, b_col, Q0, 0, None
         else:
-            return 1
+            return i_col, j_row, A, p_row, b_col, Q0, 1, None
 
     def transform_to_base(self):
 
@@ -174,114 +213,93 @@ class Simplex:
             # проверяем, совпадает ли количество выделенных столбцов
             # с количеством строк в А
             if len(indep_cols) == self.A.shape[0]:
+                for j, i in zip(indep_cols, base_rows):
+                    self.obj_coefs -= (self.obj_coefs[j] * self.A[i]).astype(float)
+                    self.free_coef -= self.obj_coefs[j] * self.b[i]
                 return indep_cols, base_rows
-        # если не выделилось ни одного столбца с единицей
-        if len(indep_cols) == 0:
-            indep_cols = [self.A.shape[1] - 1]
-        cols = deepcopy(indep_cols)
-
-        r = len(indep_cols)
-
-        # стакая столбцы, находим m независимых
-        for col in range(self.A.shape[-1] - 1, -1, -1):
-            if col not in cols:
-                cols.append(col)
-                r_new = np.linalg.matrix_rank(self.A[:, cols])
-                if r_new == r + 1:
-                    indep_cols.append(col)
-                    r = r_new
-                if r == self.A.shape[0]:
-                    break
-
-        A_new = deepcopy(self.A).astype(float)
-        b_new = deepcopy(self.b).astype(float)
-
-        # выделяем единичный базис
-        cols_perm = permutations(indep_cols, len(indep_cols))
-
-        for cols_order in cols_perm:
-            next_comb = False
-            for k, row in enumerate(A_new): # шаг метода Гаусса
-                if row[cols_order[k]] != 0: # в диагонали стоит не 0
-                    rep_row = np.repeat(row.reshape(1, -1), A_new.shape[0], axis=0)
-                    rep_row[k] = 0
-
-                    bb = np.array([b_new[k]] * len(b_new))
-                    bb[k] = 0
-
-                    mul = (A_new[:, cols_order[k]] / row[cols_order[k]])
-
-                    A_new -= rep_row * mul.reshape(-1, 1)
-                    A_new[k] /= row[cols_order[k]]
-
-                    b_new -= bb * mul
-                    b_new[k] /= row[cols_order[k]]
-                else:
-                    next_comb = True
-                    break
-            if (b_new < 0).any() or next_comb: # проверяем, не получилось ли отрицательных b
-                continue
-            else: # если все в порядке
-                indep_cols = cols_order
-                base_rows = tuple(range(self.A.shape[0]))
-                break
         else:
-            print("Can't extract basis")
-            return 0
+            print("Не выделился базис")
+            return 0, 0
 
-        self.A = A_new
-        self.b = b_new
+    def debug_print(self, i_col, j_row, A, p_row, b_col, Q0):
+        print(f'i_col: {i_col + 1}')
+        print(f'j_row: {j_row + 1}')
+        print(f'A: {A}')
+        print(f'p_row: {p_row}')
+        print(f'b_col: {b_col}')
+        print(f'Q0: {Q0}')
+        print('\n')
 
-        # Transform obj_fun
-        for j, i in zip(indep_cols, base_rows):
-            self.obj_coefs -= self.obj_coefs[j] * self.A[i]
-            self.free_coef += self.b[i]
-
-        return indep_cols, base_rows
+    def add_artificial_vars(self):
+        A_art = np.hstack((self.A, np.eye(self.A.shape[0])))
+        g_fun = -np.sum(self.A, axis=0)
+        g0 = -self.b.sum()
+        return A_art, g_fun, g0
 
     def solve(self, num_iterations=100):
 
         self._canonize()
-        rank_A = np.linalg.matrix_rank(self.A, tol=1e-12)
-        diff = self.A.shape[0] - rank_A
 
-        if diff == 0:
-            # Basis can be extracted
-            i_col, base_rows = self.transform_to_base()
+        i_col, base_rows = self.transform_to_base()
 
+        if i_col == 0:
+            print('Решаем вспомогательную задачу')
+            A_art, g, g0 = self.add_artificial_vars()
+            i_col = np.arange(self.A.shape[1], A_art.shape[1])
+            j_row = np.arange(self.A.shape[1])
+            A = self.A
+            p_row = g
+            b_col = self.b
+            Q0 = g0
+            arts = np.arange(self.A.shape[0])+self.A.shape[1]
+            art_piv_elem = None
+            for i in range(num_iterations):
+                print(f'Iteration {i}')
+                res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0, arts, art_piv_elem)
+                i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
+                self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+                if out == 0:
+                    print("No solutions")
+                    return "No solutions"
+                elif out == 1:
+                    b_count = 0
+                    new_A = np.empty(self.A.shape)
+                    new_A[:, j_row] = A
+                    eye = np.eye(self.A.shape[0])
+                    for col in range(self.A.shape[1]):
+                        if col in i_col:
+                            new_A[:, col] = eye[:, np.where(i_col==col)[0][0]]
+                            b_count+=1
+                    print(new_A.astype(int))
+                    print(self.obj_coefs)
+                    print('\n')
+                    for i, j in enumerate(i_col):
+                        self.free_coef -= self.obj_coefs[j] * b_col[i]
+                        self.obj_coefs -= (self.obj_coefs[j] * new_A[i]).astype(float)
+                        print(self.free_coef)
+
+
+                    print(self.free_coef)
+                    break
+
+        else:
             j_row = np.array([j for j in range(self.A.shape[1]) if j not in i_col]).ravel()
             A = self.A[:, j_row][base_rows]
             i_col = np.array(i_col)
-            p_row = self.obj_coefs[j_row]
-            print(self.b)
-            print(base_rows)
             b_col = self.b[base_rows]
-            Q0 = self.free_coef
-            print(f'i_col: {i_col + 1}')
-            print(f'j_row: {j_row + 1}')
-            print(f'A: {A}')
-            print(f'p_row: {p_row}')
-            print(f'b_col: {b_col}')
-            print(f'Q0: {Q0}')
-            for i in range(num_iterations):
-                print(f'Iteration {i}')
-                res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0)
-                if res == 0:
-                    print("No solutions")
-                    break
-                elif res == 1:
-                    break
-                else:
-                    i_col, j_row, A, p_row, b_col, Q0 = res
-                    print(f'i_col: {i_col + 1}')
-                    print(f'j_row: {j_row + 1}')
-                    print(f'A: {A}')
-                    print(f'p_row: {p_row}')
-                    print(f'b_col: {b_col}')
-                    print(f'Q0: {Q0}')
-        else:
-            print('Пошел нахуй')
-            print(diff)
-            print(rank_A)
-            print(self.A)
+        p_row = self.obj_coefs[j_row]
+        Q0 = self.free_coef
+        self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+        for i in range(num_iterations):
+            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+            print(f'Iteration {i}')
+            res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0)
+            i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
+            if res[-2] == 0:
+                print("No solutions")
+                break
+            elif res[-2] == 1:
+                print("kek")
+                break
+
         return self
