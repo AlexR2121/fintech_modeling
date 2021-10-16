@@ -15,7 +15,7 @@ if __name__ == '__main__':
     #                              [-2, 0, 1, -3, 1, 0, 0, 0]]),
     #               b_eq=np.array([1, 2, 6, 6, 2]),
     #               vars_constraints=None,
-    #               name='Unnamed')
+    #               name='bron1')
     # sym = Simplex(obj_coefs=np.array([5, 4]),
     #               free_coef=0,
     #               type_of_optimization='max',
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     #                              [1, 0, 1, 1, 0]]),
     #               b_eq=np.array([12, 5, 6]),
     #               vars_constraints=None,
-    #               name='Unnamed')
+    #               name='bron2')
     # sym = Simplex(obj_coefs=np.array([-2, -3, -4]),
     #               free_coef=0,
     #               type_of_optimization='min',
@@ -86,6 +86,6 @@ if __name__ == '__main__':
                   uneq_types=['<=', '<=', '<='],
                   A_eq=None,
                   b_eq=None,
-                  vars_constraints=None,
+                  vars_constraints=['arb', 'arb'],
                   name='13')
     print(sym.solve())

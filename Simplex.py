@@ -19,9 +19,10 @@ class Simplex:
         self.name = name
         self.obj_coefs = np.array(obj_coefs).astype(float)
         self.free_coef = free_coef
+        self.type_of_optimization = type_of_optimization
 
         # canonized form requires min
-        if type_of_optimization == 'max':
+        if self.type_of_optimization == 'max':
             self.obj_coefs *= -1
             self.free_coef *= -1
 
@@ -40,12 +41,13 @@ class Simplex:
         else:
             self.A_eq = None
         self.vars_constraints = vars_constraints
+        self.initial_vars = list(range(len(obj_coefs)))
         self.arbitrary_vars_map = dict()
 
     def _deal_with_arbitrary_vars(self):
         # canonized form requires non-negative vars
         k = len(self.vars_constraints)
-        for i, var_constr in self.vars_constraints:
+        for i, var_constr in enumerate(self.vars_constraints):
             if var_constr == '<=':
                 self.arbitrary_vars_map[i] = [i]
                 if self.A_eq is not None:
@@ -56,10 +58,13 @@ class Simplex:
             elif var_constr == 'arb':
                 self.arbitrary_vars_map[i] = [i, k]
                 if self.A_eq is not None:
-                    self.A_eq = np.hstack((self.A_eq, -self.A_eq[:, i]))
+                    self.A_eq = np.hstack((self.A_eq, -self.A_eq[:, i].reshape(-1, 1)))
                 if self.A_uneq is not None:
-                    self.A_uneq = np.hstack((self.A_uneq, -self.A_uneq[:, i]))
-                self.obj_coefs = np.hstack((self.obj_coefs, -self.obj_coefs[i].reshape(1, 1)))
+                    self.A_uneq = np.hstack((self.A_uneq, -self.A_uneq[:, i].reshape(-1, 1)))
+                new_obj = np.empty((len(self.obj_coefs)+1,))
+                new_obj[:len(self.obj_coefs)] = self.obj_coefs
+                new_obj[-1] = -self.obj_coefs[i]
+                self.obj_coefs = new_obj
                 k += 1
         return self
 
@@ -130,7 +135,10 @@ class Simplex:
                 if pivot_elem is None: # проверяем не случай ли IIб
                     b_a = np.argsort(b_col / A[:, pivot_col])
                     for i in b_a:
-                        if A[i, pivot_col] >= 0:
+                        # if b_col[i] == 0: #вырожденное решение
+                        #     pivot_row = i
+                        #     break
+                        if A[i, pivot_col] > 0:
                             pivot_row = i
                             break
                     else:
@@ -294,14 +302,22 @@ class Simplex:
                 for b, i in enumerate(i_col):
                     solution_dict[f'x{i}'] = round(b_col[b], 2)
                 if self.arbitrary_vars_map:
-                    for k, v in self.arbitrary_vars_map.values():
+                    for k, v in self.arbitrary_vars_map.items():
                         if len(v) == 1:
                             solution_dict[f'x{k}'] = -solution_dict[f'x{k}']
                         else:
                             solution_dict[f'x{v[0]}'] -= round(solution_dict[f'x{v[1]}'],2)
-                            del solution_dict[f'x{v[1]}']
+                fin_vars = deepcopy(list(solution_dict.keys()))
+                for k in fin_vars:
+                    num = int(k[1:])
+                    if num not in self.initial_vars:
+                        del solution_dict[f'x{num}']
+
                 solution_dict =  dict(sorted(solution_dict.items(), key = lambda x: int(x[0][1:])))
-                solution_dict['Q_opt'] = round(-Q0, 2)
+                if self.type_of_optimization == 'max':
+                    solution_dict['Q_opt'] = round(Q0, 2)
+                else:
+                    solution_dict['Q_opt'] = round(-Q0, 2)
                 return solution_dict
 
         return "Количество итераций превысило максимум"
