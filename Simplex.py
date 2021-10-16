@@ -304,4 +304,4 @@ class Simplex:
                 solution_dict['Q_opt'] = round(-Q0, 2)
                 return solution_dict
 
-        return self
+        return "Количество итераций превысило максимум"
