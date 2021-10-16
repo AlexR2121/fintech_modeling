@@ -40,10 +40,10 @@ class Simplex:
         else:
             self.A_eq = None
         self.vars_constraints = vars_constraints
+        self.arbitrary_vars_map = dict()
 
     def _deal_with_arbitrary_vars(self):
         # canonized form requires non-negative vars
-        self.arbitrary_vars_map = dict()
         k = len(self.vars_constraints)
         for i, var_constr in self.vars_constraints:
             if var_constr == '<=':
@@ -59,7 +59,7 @@ class Simplex:
                     self.A_eq = np.hstack((self.A_eq, -self.A_eq[:, i]))
                 if self.A_uneq is not None:
                     self.A_uneq = np.hstack((self.A_uneq, -self.A_uneq[:, i]))
-                self.obj_coefs = np.hstack((self.obj_coefs, -self.obj_coefs[i]))
+                self.obj_coefs = np.hstack((self.obj_coefs, -self.obj_coefs[i].reshape(1, 1)))
                 k += 1
         return self
 
@@ -121,13 +121,6 @@ class Simplex:
 
     def simplex_step(self, i_col, j_row, A, p_row, b_col, Q0, art = None, pivot_elem = None):
 
-        # lel = np.argsort(p_row)
-        # lol = np.sort(p_row)
-        # if np.isclose(lol[0],lol[1]):
-        #     ik = 1
-        #     pivot_col = lel[ik]
-        # else:
-        #     pivot_col = lel[0]
         pivot_col = np.argmin(p_row)
 
         if p_row[pivot_col] < 0 or pivot_elem is not None: # проверяем закончено ли обновление или случай IIб
@@ -137,7 +130,7 @@ class Simplex:
                 if pivot_elem is None: # проверяем не случай ли IIб
                     b_a = np.argsort(b_col / A[:, pivot_col])
                     for i in b_a:
-                        if A[i, pivot_col] > 0:
+                        if A[i, pivot_col] >= 0:
                             pivot_row = i
                             break
                     else:
@@ -214,20 +207,21 @@ class Simplex:
             # с количеством строк в А
             if len(indep_cols) == self.A.shape[0]:
                 for j, i in zip(indep_cols, base_rows):
-                    self.obj_coefs -= (self.obj_coefs[j] * self.A[i]).astype(float)
                     self.free_coef -= self.obj_coefs[j] * self.b[i]
+                    self.obj_coefs -= (self.obj_coefs[j] * self.A[i]).astype(float)
+
                 return indep_cols, base_rows
         else:
-            print("Не выделился базис")
+            print("Нельзя сходу выделить единичный базис")
             return 0, 0
 
     def debug_print(self, i_col, j_row, A, p_row, b_col, Q0):
-        print(f'i_col: {i_col + 1}')
-        print(f'j_row: {j_row + 1}')
+        print(f'i_col: {i_col}')
+        print(f'j_row: {j_row}')
         print(f'A: {A}')
         print(f'p_row: {p_row}')
         print(f'b_col: {b_col}')
-        print(f'Q0: {Q0}')
+        print(f'-Q0: {Q0}')
         print('\n')
 
     def add_artificial_vars(self):
@@ -243,7 +237,7 @@ class Simplex:
         i_col, base_rows = self.transform_to_base()
 
         if i_col == 0:
-            print('Решаем вспомогательную задачу')
+            print('Решаем вспомогательную задачу\n')
             A_art, g, g0 = self.add_artificial_vars()
             i_col = np.arange(self.A.shape[1], A_art.shape[1])
             j_row = np.arange(self.A.shape[1])
@@ -270,16 +264,9 @@ class Simplex:
                         if col in i_col:
                             new_A[:, col] = eye[:, np.where(i_col==col)[0][0]]
                             b_count+=1
-                    print(new_A.astype(int))
-                    print(self.obj_coefs)
-                    print('\n')
                     for i, j in enumerate(i_col):
                         self.free_coef -= self.obj_coefs[j] * b_col[i]
                         self.obj_coefs -= (self.obj_coefs[j] * new_A[i]).astype(float)
-                        print(self.free_coef)
-
-
-                    print(self.free_coef)
                     break
 
         else:
@@ -287,19 +274,34 @@ class Simplex:
             A = self.A[:, j_row][base_rows]
             i_col = np.array(i_col)
             b_col = self.b[base_rows]
+        print('Решаем основную задачу')
         p_row = self.obj_coefs[j_row]
         Q0 = self.free_coef
+        print('Начальные данные:')
         self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
         for i in range(num_iterations):
-            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
             print(f'Iteration {i}')
             res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0)
             i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
+            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
             if res[-2] == 0:
-                print("No solutions")
+                print("Нет решений")
                 break
             elif res[-2] == 1:
-                print("kek")
-                break
+                solution_dict = dict()
+                for j in j_row:
+                    solution_dict[f'x{j}'] = 0
+                for b, i in enumerate(i_col):
+                    solution_dict[f'x{i}'] = round(b_col[b], 2)
+                if self.arbitrary_vars_map:
+                    for k, v in self.arbitrary_vars_map.values():
+                        if len(v) == 1:
+                            solution_dict[f'x{k}'] = -solution_dict[f'x{k}']
+                        else:
+                            solution_dict[f'x{v[0]}'] -= round(solution_dict[f'x{v[1]}'],2)
+                            del solution_dict[f'x{v[1]}']
+                solution_dict =  dict(sorted(solution_dict.items(), key = lambda x: int(x[0][1:])))
+                solution_dict['Q_opt'] = round(-Q0, 2)
+                return solution_dict
 
         return self
