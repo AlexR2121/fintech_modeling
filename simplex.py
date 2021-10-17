@@ -208,14 +208,14 @@ class Simplex:
                 # что коэффициент при переменной больше нуля
                 if br not in base_rows and self.A[br, i] > 0:
                     base_rows.append(br)
-                    self.A[br] = self.A[br] / self.A[br, i]
                     self.b[br] = self.b[br] / self.A[br, i]
+                    self.A[br] /= self.A[br, i]
                     indep_cols.append(i)
             # проверяем, совпадает ли количество выделенных столбцов
             # с количеством строк в А
             if len(indep_cols) == self.A.shape[0]:
                 for j, i in zip(indep_cols, base_rows):
-                    self.free_coef -= self.obj_coefs[j] * self.b[i]
+                    self.free_coef += self.obj_coefs[j] * self.b[i]
                     self.obj_coefs -= (self.obj_coefs[j] * self.A[i]).astype(float)
 
                 return indep_cols, base_rows
@@ -241,7 +241,8 @@ class Simplex:
     def solve(self, num_iterations=100):
 
         self._canonize()
-
+        self.A = self.A.astype(float)
+        self.b = self.b.astype(float)
         i_col, base_rows = self.transform_to_base()
 
         if i_col == 0:
@@ -273,7 +274,7 @@ class Simplex:
                             new_A[:, col] = eye[:, np.where(i_col==col)[0][0]]
                             b_count+=1
                     for i, j in enumerate(i_col):
-                        self.free_coef -= self.obj_coefs[j] * b_col[i]
+                        self.free_coef += self.obj_coefs[j] * b_col[i]
                         self.obj_coefs -= (self.obj_coefs[j] * new_A[i]).astype(float)
                     break
 
@@ -284,7 +285,7 @@ class Simplex:
             b_col = self.b[base_rows]
         print('Решаем основную задачу')
         p_row = self.obj_coefs[j_row]
-        Q0 = self.free_coef
+        Q0 = -self.free_coef
         print('Начальные данные:')
         self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
         for i in range(num_iterations):
@@ -317,7 +318,7 @@ class Simplex:
                 if self.type_of_optimization == 'max':
                     solution_dict['Q_opt'] = round(Q0, 2)
                 else:
-                    solution_dict['Q_opt'] = round(-Q0, 2)
+                    solution_dict['Q_opt'] = -round(Q0, 2)
                 return solution_dict
 
         return "Количество итераций превысило максимум"
