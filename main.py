@@ -1,4 +1,4 @@
-from Simplex import Simplex
+from simplex import Simplex
 import numpy as np
 
 if __name__ == '__main__':
@@ -40,18 +40,18 @@ if __name__ == '__main__':
     #               b_eq=None,
     #               vars_constraints=None,
     #               name='Wiki')
-    # sym = Simplex(obj_coefs=np.array([2, 1, -1, 3, -1]),
-    #               free_coef=0,
-    #               type_of_optimization='min',
-    #               A_uneq=None,
-    #               b_uneq=None,
-    #               uneq_types=None,
-    #               A_eq=np.array([[3, 0, 2, 0, -1],
-    #                              [1, -1, 1, 0, 0],
-    #                              [1, 0, 1, 1, 0]]),
-    #               b_eq=np.array([12, 5, 6]),
-    #               vars_constraints=None,
-    #               name='bron2')
+    sym = Simplex(obj_coefs=np.array([2, 1, -1, 3, -1]),
+                  free_coef=0,
+                  type_of_optimization='min',
+                  A_uneq=None,
+                  b_uneq=None,
+                  uneq_types=None,
+                  A_eq=np.array([[3, 0, 2, 0, -1],
+                                 [1, -1, 1, 0, 0],
+                                 [1, 0, 1, 1, 0]]),
+                  b_eq=np.array([12, 5, 6]),
+                  vars_constraints=None,
+                  name='bron2')
     # sym = Simplex(obj_coefs=np.array([-2, -3, -4]),
     #               free_coef=0,
     #               type_of_optimization='min',
@@ -76,16 +76,16 @@ if __name__ == '__main__':
     #               b_eq=None,
     #               vars_constraints=None,
     #               name='9')
-    sym = Simplex(obj_coefs=np.array([-3, 1]),
-                  free_coef=0,
-                  type_of_optimization='min',
-                  A_uneq=np.array([[2, -1],
-                                   [1, -2],
-                                   [1, 1]]),
-                  b_uneq=np.array([4, 2, 5]),
-                  uneq_types=['<=', '<=', '<='],
-                  A_eq=None,
-                  b_eq=None,
-                  vars_constraints=['arb', 'arb'],
-                  name='13')
+    # sym = Simplex(obj_coefs=np.array([-3, 1]),
+    #               free_coef=0,
+    #               type_of_optimization='min',
+    #               A_uneq=np.array([[2, -1],
+    #                                [1, -2],
+    #                                [1, 1]]),
+    #               b_uneq=np.array([4, 2, 5]),
+    #               uneq_types=['<=', '<=', '<='],
+    #               A_eq=None,
+    #               b_eq=None,
+    #               vars_constraints=['<=', 'arb'],
+    #               name='13')
     print(sym.solve())
