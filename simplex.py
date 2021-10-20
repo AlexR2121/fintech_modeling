@@ -256,13 +256,14 @@ class Simplex:
             Q0 = g0
             arts = np.arange(self.A.shape[0])+self.A.shape[1]
             art_piv_elem = None
+            print('Начальные данные:')
+            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
             for i in range(num_iterations):
                 print(f'Iteration {i}')
                 res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0, arts, art_piv_elem)
                 i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
                 self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
                 if out == 0:
-                    print("No solutions")
                     return "No solutions"
                 elif out == 1:
                     b_count = 0
@@ -294,7 +295,7 @@ class Simplex:
             i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
             self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
             if res[-2] == 0:
-                print("Нет решений")
+                return "Нет решений"
                 break
             elif res[-2] == 1:
                 solution_dict = dict()
