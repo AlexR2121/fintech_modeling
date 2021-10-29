@@ -238,7 +238,7 @@ class Simplex:
         g0 = -self.b.sum()
         return A_art, g_fun, g0
 
-    def solve(self, num_iterations=100):
+    def solve(self, num_iterations=10000, verbose=False):
 
         self._canonize()
         self.A = self.A.astype(float)
@@ -246,7 +246,8 @@ class Simplex:
         i_col, base_rows = self.transform_to_base()
 
         if i_col == 0:
-            print('Решаем вспомогательную задачу\n')
+            if verbose:
+                print('Решаем вспомогательную задачу\n')
             A_art, g, g0 = self.add_artificial_vars()
             i_col = np.arange(self.A.shape[1], A_art.shape[1])
             j_row = np.arange(self.A.shape[1])
@@ -256,13 +257,16 @@ class Simplex:
             Q0 = g0
             arts = np.arange(self.A.shape[0])+self.A.shape[1]
             art_piv_elem = None
-            print('Начальные данные:')
-            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+            if verbose:
+                print('Начальные данные:')
+                self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
             for i in range(num_iterations):
-                print(f'Iteration {i}')
+                if verbose:
+                    print(f'Iteration {i}')
                 res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0, arts, art_piv_elem)
                 i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
-                self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+                if verbose:
+                    self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
                 if out == 0:
                     return "No solutions"
                 elif out == 1:
@@ -284,16 +288,20 @@ class Simplex:
             A = self.A[:, j_row][base_rows]
             i_col = np.array(i_col)
             b_col = self.b[base_rows]
-        print('Решаем основную задачу')
+        if verbose:
+            print('Решаем основную задачу')
         p_row = self.obj_coefs[j_row]
         Q0 = -self.free_coef
-        print('Начальные данные:')
-        self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+        if verbose:
+            print('Начальные данные:')
+            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
         for i in range(num_iterations):
-            print(f'Iteration {i}')
+            if verbose:
+                print(f'Iteration {i}')
             res = self.simplex_step(i_col, j_row, A, p_row, b_col, Q0)
             i_col, j_row, A, p_row, b_col, Q0, out, art_piv_elem = res
-            self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
+            if verbose:
+                self.debug_print(i_col, j_row, A, p_row, b_col, Q0)
             if res[-2] == 0:
                 return "Нет решений"
                 break
@@ -302,13 +310,13 @@ class Simplex:
                 for j in j_row:
                     solution_dict[f'x{j}'] = 0
                 for b, i in enumerate(i_col):
-                    solution_dict[f'x{i}'] = round(b_col[b], 2)
+                    solution_dict[f'x{i}'] = b_col[b]
                 if self.arbitrary_vars_map:
                     for k, v in self.arbitrary_vars_map.items():
                         if len(v) == 1:
                             solution_dict[f'x{k}'] = -solution_dict[f'x{k}']
                         else:
-                            solution_dict[f'x{v[0]}'] -= round(solution_dict[f'x{v[1]}'],2)
+                            solution_dict[f'x{v[0]}'] -= solution_dict[f'x{v[1]}']
                 fin_vars = deepcopy(list(solution_dict.keys()))
                 for k in fin_vars:
                     num = int(k[1:])
@@ -317,9 +325,9 @@ class Simplex:
 
                 solution_dict =  dict(sorted(solution_dict.items(), key = lambda x: int(x[0][1:])))
                 if self.type_of_optimization == 'max':
-                    solution_dict['Q_opt'] = round(Q0, 2)
+                    solution_dict['Q_opt'] = Q0
                 else:
-                    solution_dict['Q_opt'] = -round(Q0, 2)
+                    solution_dict['Q_opt'] = -Q0
                 return solution_dict
 
         return "Количество итераций превысило максимум"
