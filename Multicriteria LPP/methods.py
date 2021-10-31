@@ -1,17 +1,34 @@
+import numpy
 import numpy as np
 import pandas as pd
 from pulp import LpMaximize, LpProblem, LpVariable
+from typing import Union
 
 class MultiObjectiveProblem:
-    def __init__(self, objs_coefs, types_of_optimization,
-                 free_coefs = None,
-                 A_uneq=None, b_uneq=None,
-                 uneq_types=None, A_eq=None,
-                 b_eq=None, vars_constraints=None):
+    def __init__(self, objs_coefs: numpy.ndarray,
+                 types_of_optimization: list,
+                 free_coefs: Union[numpy.ndarray, None] = None,
+                 A_uneq: Union[numpy.ndarray, None] = None,
+                 b_uneq: Union[numpy.ndarray, None] = None,
+                 uneq_types: Union[list, None] = None,
+                 A_eq: Union[numpy.ndarray, None] = None,
+                 b_eq: Union[numpy.ndarray, None] = None,
+                 vars_constraints: Union[numpy.ndarray, None] =None,
+                 ranks: Union[numpy.ndarray, list, None] = None):
 
-        self.objs_coefs = objs_coefs
-        self.free_coefs = free_coefs
-        self.types_of_optimization = types_of_optimization
+        if ranks is not None:
+            if isinstance(ranks, list):
+                self.ranks = np.array(ranks)-1
+        else:
+            self.ranks = np.arange(objs_coefs.shape[0])
+
+        self.objs_coefs = objs_coefs[self.ranks]
+        if free_coefs is not None:
+            self.free_coefs = free_coefs[self.ranks]
+        else:
+            self.free_coefs = free_coefs
+
+        self.types_of_optimization = np.array(types_of_optimization)[self.ranks]
 
         self.A_uneq = A_uneq
         self.b_uneq = b_uneq

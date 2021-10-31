@@ -48,23 +48,23 @@ if __name__ == '__main__':
     #                                 uneq_types=['<='] * 7 + ['>='] * 5 + ['<='] * 5)
     # print(problem.solve_successive(0.1).to_string())
 
-    # problem = MultiObjectiveProblem(objs_coefs=np.array([[1, 0],
-    #                                                      [0, 1]]),
-    #                                 types_of_optimization=['max']*2,
-    #                                 free_coefs=np.zeros(2),
-    #                                 A_uneq=np.array([[1, 2]]),
-    #                                 b_uneq=np.array([2]),
-    #                                 uneq_types=['<='])
-    # print(problem.solve_eps_constraints([0.4, 0.4], 0).to_string())
+    problem = MultiObjectiveProblem(objs_coefs=np.array([[1, 0],
+                                                         [0, 1]]),
+                                    types_of_optimization=['max']*2,
+                                    free_coefs=np.zeros(2),
+                                    A_uneq=np.array([[1, 2]]),
+                                    b_uneq=np.array([2]),
+                                    uneq_types=['<='])
+    print(problem.solve_eps_constraints([0.4, 0.4], 0).to_string())
 
-    problem = MultiObjectiveProblem(objs_coefs=np.array([[  8,   7],
-                                                         [-34, -24]]),
-                                    types_of_optimization=['max', 'min'],
-                                    free_coefs=np.array([0, 1248]),
-                                    A_uneq=np.array([[4, 3],
-                                                     [2, 1],
-                                                     [2, 3]]),
-                                    b_uneq=np.array([144, 64, 120]),
-                                    uneq_types=['<=']*3)
-
-    print(problem.solve_successive([8]).to_string())
+    # problem = MultiObjectiveProblem(objs_coefs=np.array([[  8,   7],
+    #                                                      [-34, -24]]),
+    #                                 types_of_optimization=['max', 'min'],
+    #                                 free_coefs=np.array([0, 1248]),
+    #                                 A_uneq=np.array([[4, 3],
+    #                                                  [2, 1],
+    #                                                  [2, 3]]),
+    #                                 b_uneq=np.array([144, 64, 120]),
+    #                                 uneq_types=['<=']*3)
+    #
+    # print(problem.solve_successive([8]).to_string())
